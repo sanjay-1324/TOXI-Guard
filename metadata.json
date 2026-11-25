@@ -1,0 +1,6 @@
+{
+  "name": "ToxiGuard",
+  "description": "Cyberbullying and toxic comment detection workbench with code-mixed Tanglish NLP normalization, TF-IDF + Logistic Regression & SVM classifiers, and moderation reporting.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

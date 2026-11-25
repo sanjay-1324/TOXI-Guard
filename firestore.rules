@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Shared Hardened Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerifiedUser() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isBootstrapAdminEmail() {
+      return isVerifiedUser() && request.auth.token.email == 'kumarasanjay1324@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrapAdminEmail() || (
+        isVerifiedUser() && exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    function isValidFlaggedWords(words) {
+      return words is list
+        && words.size() <= 25
+        && (words.size() == 0 || (words[0] is string && words[0].size() <= 64));
+    }
+
+    function isValidReport(data) {
+      return data.keys().hasAll([
+          'reporterId', 'reporterEmail', 'reporterName', 'commentText',
+          'normalizedText', 'languageProfile', 'predictedLabel',
+          'severityScore', 'severityTier', 'modelUsed', 'flaggedWords',
+          'reasonCategory', 'userNotes', 'sourceContext', 'status',
+          'adminNote', 'reviewedBy', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'reporterId', 'reporterEmail', 'reporterName', 'commentText',
+          'normalizedText', 'languageProfile', 'predictedLabel',
+          'severityScore', 'severityTier', 'modelUsed', 'flaggedWords',
+          'reasonCategory', 'userNotes', 'sourceContext', 'status',
+          'adminNote', 'reviewedBy', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.reporterId)
+        && data.reporterEmail is string && data.reporterEmail.size() <= 200
+        && data.reporterName is string && data.reporterName.size() <= 120
+        && data.commentText is string && data.commentText.size() >= 1 && data.commentText.size() <= 2000
+        && data.normalizedText is string && data.normalizedText.size() <= 2000
+        && data.languageProfile in ['English', 'Tanglish', 'Tamil', 'Code-Mixed']
+        && data.predictedLabel in ['Toxic', 'Non-Toxic']
+        && (data.severityScore is int || data.severityScore is float)
+        && data.severityScore >= 0 && data.severityScore <= 100
+        && data.severityTier in ['Safe', 'Mild', 'Moderate', 'Severe']
+        && data.modelUsed in ['Logistic Regression', 'Linear SVM', 'Ensemble']
+        && isValidFlaggedWords(data.flaggedWords)
+        && data.reasonCategory in ['Cyberbullying', 'Hate Speech', 'Profanity / Slur', 'Harassment / Threat', 'Tanglish Abuse', 'Other']
+        && data.userNotes is string && data.userNotes.size() <= 500
+        && data.sourceContext in ['Comment Analyzer', 'Social Feed', 'Batch Inspector']
+        && data.status in ['pending', 'confirmed_toxic', 'dismissed', 'escalated']
+        && data.adminNote is string && data.adminNote.size() <= 500
+        && data.reviewedBy is string && data.reviewedBy.size() <= 200
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidSavedAnalysis(data) {
+      return data.keys().hasAll([
+          'userId', 'commentText', 'normalizedText', 'languageProfile',
+          'predictedLabel', 'severityScore', 'severityTier',
+          'lrProbability', 'svmScore', 'flaggedWords', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'userId', 'commentText', 'normalizedText', 'languageProfile',
+          'predictedLabel', 'severityScore', 'severityTier',
+          'lrProbability', 'svmScore', 'flaggedWords', 'createdAt'
+        ])
+        && isValidId(data.userId)
+        && data.commentText is string && data.commentText.size() >= 1 && data.commentText.size() <= 2000
+        && data.normalizedText is string && data.normalizedText.size() <= 2000
+        && data.languageProfile in ['English', 'Tanglish', 'Tamil', 'Code-Mixed']
+        && data.predictedLabel in ['Toxic', 'Non-Toxic']
+        && (data.severityScore is int || data.severityScore is float)
+        && data.severityScore >= 0 && data.severityScore <= 100
+        && data.severityTier in ['Safe', 'Mild', 'Moderate', 'Severe']
+        && (data.lrProbability is int || data.lrProbability is float)
+        && data.lrProbability >= 0 && data.lrProbability <= 1
+        && (data.svmScore is int || data.svmScore is float)
+        && data.svmScore >= 0 && data.svmScore <= 1
+        && isValidFlaggedWords(data.flaggedWords)
+        && data.createdAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'role', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'role', 'createdAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 200
+        && data.role == 'admin'
+        && data.createdAt is timestamp;
+    }
+
+    // Flagged Comment Reports
+    match /reports/{reportId} {
+      allow get: if isValidId(reportId) && isVerifiedUser() && (
+        existing().reporterId == request.auth.uid || isAdmin()
+      );
+
+      // Zero get()/exists() in allow list (Pillar 8 Cost-Optimization)
+      allow list: if isVerifiedUser() && (
+        isBootstrapAdminEmail() || existing().reporterId == request.auth.uid
+      );
+
+      allow create: if isValidId(reportId)
+        && isVerifiedUser()
+        && isValidReport(incoming())
+        && incoming().reporterId == request.auth.uid
+        && incoming().status == 'pending'
+        && incoming().adminNote == ''
+        && incoming().reviewedBy == ''
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidId(reportId)
+        && isVerifiedUser()
+        && isValidReport(incoming())
+        && incoming().reporterId == existing().reporterId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'adminNote', 'reviewedBy', 'updatedAt'])) ||
+          (existing().reporterId == request.auth.uid
+            && existing().status == 'pending'
+            && incoming().status == 'pending'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['reasonCategory', 'userNotes', 'updatedAt']))
+        );
+
+      allow delete: if isValidId(reportId) && isVerifiedUser() && (
+        isAdmin() || (existing().reporterId == request.auth.uid && existing().status == 'pending')
+      );
+    }
+
+    // Private Saved Analyses per User
+    match /users/{userId}/analyses/{analysisId} {
+      allow get: if isValidId(userId) && isValidId(analysisId) && isVerifiedUser() && (
+        request.auth.uid == userId || isAdmin()
+      );
+
+      allow list: if isValidId(userId) && isVerifiedUser() && (
+        request.auth.uid == userId || isBootstrapAdminEmail()
+      );
+
+      allow create: if isValidId(userId)
+        && isValidId(analysisId)
+        && isVerifiedUser()
+        && request.auth.uid == userId
+        && isValidSavedAnalysis(incoming())
+        && incoming().userId == request.auth.uid
+        && incoming().createdAt == request.time;
+
+      allow update: if false;
+
+      allow delete: if isValidId(userId) && isValidId(analysisId) && isVerifiedUser() && (
+        request.auth.uid == userId || isAdmin()
+      );
+    }
+
+    // Trusted Admin Registry
+    match /admins/{adminId} {
+      allow get: if isValidId(adminId) && isVerifiedUser() && (
+        request.auth.uid == adminId || isAdmin()
+      );
+      allow list: if isBootstrapAdminEmail();
+      allow create, update: if isValidId(adminId)
+        && isBootstrapAdminEmail()
+        && isValidAdminRecord(incoming())
+        && incoming().uid == adminId
+        && incoming().createdAt == request.time;
+      allow delete: if isValidId(adminId) && isBootstrapAdminEmail();
+    }
+  }
+}

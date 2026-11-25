@@ -1,0 +1,246 @@
+{
+  "entities": {
+    "Report": {
+      "title": "Flagged Comment Report",
+      "description": "A user-submitted report flagging a toxic or cyberbullying comment for administrator moderation.",
+      "type": "object",
+      "properties": {
+        "reporterId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user who submitted the report.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "reporterEmail": {
+          "type": "string",
+          "description": "Verified email address of the reporter.",
+          "maxLength": 200
+        },
+        "reporterName": {
+          "type": "string",
+          "description": "Display name of the reporter.",
+          "maxLength": 120
+        },
+        "commentText": {
+          "type": "string",
+          "description": "Original raw comment text that was flagged.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "normalizedText": {
+          "type": "string",
+          "description": "Preprocessed and Tanglish-normalized text produced by the NLP pipeline.",
+          "maxLength": 2000
+        },
+        "languageProfile": {
+          "type": "string",
+          "description": "Detected language mix of the comment.",
+          "enum": ["English", "Tanglish", "Tamil", "Code-Mixed"]
+        },
+        "predictedLabel": {
+          "type": "string",
+          "description": "Classifier prediction.",
+          "enum": ["Toxic", "Non-Toxic"]
+        },
+        "severityScore": {
+          "type": "number",
+          "description": "Computed toxicity severity score from 0 to 100."
+        },
+        "severityTier": {
+          "type": "string",
+          "description": "Categorized severity level.",
+          "enum": ["Safe", "Mild", "Moderate", "Severe"]
+        },
+        "modelUsed": {
+          "type": "string",
+          "description": "Classification model used during evaluation.",
+          "enum": ["Logistic Regression", "Linear SVM", "Ensemble"]
+        },
+        "flaggedWords": {
+          "type": "array",
+          "description": "Bounded list of offensive tokens highlighted by the detector (max 25)."
+        },
+        "reasonCategory": {
+          "type": "string",
+          "description": "User-selected abuse category for moderation triage.",
+          "enum": ["Cyberbullying", "Hate Speech", "Profanity / Slur", "Harassment / Threat", "Tanglish Abuse", "Other"]
+        },
+        "userNotes": {
+          "type": "string",
+          "description": "Optional context note from the reporting user.",
+          "maxLength": 500
+        },
+        "sourceContext": {
+          "type": "string",
+          "description": "Surface from which the comment was reported.",
+          "enum": ["Comment Analyzer", "Social Feed", "Batch Inspector"]
+        },
+        "status": {
+          "type": "string",
+          "description": "Moderation workflow status.",
+          "enum": ["pending", "confirmed_toxic", "dismissed", "escalated"]
+        },
+        "adminNote": {
+          "type": "string",
+          "description": "Administrator review decision note.",
+          "maxLength": 500
+        },
+        "reviewedBy": {
+          "type": "string",
+          "description": "Email of the administrator who reviewed the report.",
+          "maxLength": 200
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the report was last updated."
+        }
+      },
+      "required": [
+        "reporterId",
+        "reporterEmail",
+        "reporterName",
+        "commentText",
+        "normalizedText",
+        "languageProfile",
+        "predictedLabel",
+        "severityScore",
+        "severityTier",
+        "modelUsed",
+        "flaggedWords",
+        "reasonCategory",
+        "userNotes",
+        "sourceContext",
+        "status",
+        "adminNote",
+        "reviewedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "SavedAnalysis": {
+      "title": "Saved Comment Analysis",
+      "description": "Personal comment toxicity analysis record saved by a signed-in user.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner Firebase Auth UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "commentText": {
+          "type": "string",
+          "description": "Original comment text analyzed.",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "normalizedText": {
+          "type": "string",
+          "description": "Cleaned and Tanglish-normalized text.",
+          "maxLength": 2000
+        },
+        "languageProfile": {
+          "type": "string",
+          "description": "Detected language profile.",
+          "enum": ["English", "Tanglish", "Tamil", "Code-Mixed"]
+        },
+        "predictedLabel": {
+          "type": "string",
+          "description": "Classifier decision.",
+          "enum": ["Toxic", "Non-Toxic"]
+        },
+        "severityScore": {
+          "type": "number",
+          "description": "Severity score 0-100."
+        },
+        "severityTier": {
+          "type": "string",
+          "description": "Severity tier.",
+          "enum": ["Safe", "Mild", "Moderate", "Severe"]
+        },
+        "lrProbability": {
+          "type": "number",
+          "description": "Logistic Regression toxicity probability (0-1)."
+        },
+        "svmScore": {
+          "type": "number",
+          "description": "Linear SVM calibrated toxicity probability (0-1)."
+        },
+        "flaggedWords": {
+          "type": "array",
+          "description": "Bounded list of offensive words detected (max 25)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of analysis."
+        }
+      },
+      "required": [
+        "userId",
+        "commentText",
+        "normalizedText",
+        "languageProfile",
+        "predictedLabel",
+        "severityScore",
+        "severityTier",
+        "lrProbability",
+        "svmScore",
+        "flaggedWords",
+        "createdAt"
+      ]
+    },
+    "AdminRecord": {
+      "title": "Moderator Admin Record",
+      "description": "Trusted administrator grant document.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Admin user UID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "Admin email address.",
+          "maxLength": 200
+        },
+        "role": {
+          "type": "string",
+          "description": "Fixed admin role marker.",
+          "enum": ["admin"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when admin access was recorded."
+        }
+      },
+      "required": ["uid", "email", "role", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/reports/{reportId}": {
+      "schema": { "$ref": "#/entities/Report" },
+      "description": "Flagged toxic comments queued for administrator review."
+    },
+    "/users/{userId}/analyses/{analysisId}": {
+      "schema": { "$ref": "#/entities/SavedAnalysis" },
+      "description": "Private analysis history per authenticated user."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted administrator directory."
+    }
+  }
+}
